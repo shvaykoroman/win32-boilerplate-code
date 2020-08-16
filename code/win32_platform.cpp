@@ -1,26 +1,11 @@
 #include <windows.h>
 #include <stdint.h>
-
-#define internal static
-#define global static
-#define local_persist static
-
-#define assert(expression) if(!(expression)) {*(s32*)0 = 0;}
-
-typedef int8_t  s8;
-typedef int16_t s16;
-typedef int32_t s32;
-typedef int64_t s64;
-
-typedef uint8_t u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef uint64_t u64;
-
-typedef float  f32;
-typedef double f64;
+#include <gl/gl.h>
+#include "mario.h"
+#include "mario.cpp"
 
 global bool gAppIsRunning;
+#define SOFTWARE_RENDERER 0
 
 struct Framebuffer
 {
@@ -78,27 +63,46 @@ createFramebuffer(Framebuffer *framebuffer, s32 width, s32 height)
   framebuffer->memory = VirtualAlloc(0,(size_t)framebufferSize,MEM_COMMIT | MEM_RESERVE,PAGE_READWRITE);
   framebuffer->stride = framebuffer->width * framebuffer->bytesPerPixel;
   
-  s8 *destRow = (s8*)framebuffer->memory;
-  
-  for(u32 y = 0; y < framebuffer->height; y++)
-    {
-      s8 *pixel = destRow;
-      for(u32 x = 0; x < framebuffer->width; x++)
-	{
-	  *pixel++ = 255;
-	  *pixel++ = 0;
-	  *pixel++ = 255;
-	  *pixel++;
-	}
-      destRow += framebuffer->stride;
-    }
+  s8 *destRow = (s8*)framebuffer->memory;  
 }
 
+internal void
+createOpenglContext(HWND window, HDC deviceContext)
+{
+  PIXELFORMATDESCRIPTOR pixelFormat = {};
+
+  pixelFormat.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+  pixelFormat.nVersion = 1;
+  pixelFormat.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+  pixelFormat.iPixelType = PFD_TYPE_RGBA;
+  pixelFormat.cColorBits = 24;
+  pixelFormat.cStencilBits = 8;
+  pixelFormat.iLayerType = PFD_MAIN_PLANE;
+
+  s32 pixelFormatIndex = ChoosePixelFormat(deviceContext, &pixelFormat);
+  if(SetPixelFormat(deviceContext,pixelFormatIndex,&pixelFormat))
+    {
+      HGLRC renderingContext = wglCreateContext(deviceContext);
+      if(renderingContext)
+	{
+	  // NOTE(shvayko): SUCCESS
+	  bool result = wglMakeCurrent(deviceContext, renderingContext);
+	}
+      else
+	{
+	  
+	}
+    }
+  else
+    {
+      
+    }
+}
 
 internal void
 blitBufferToScreen(Framebuffer *framebuffer, HDC deviceContext,s32 width,s32 height)
 {
-  
+#if SOFTWARE_RENDERER 
   StretchDIBits(
 		deviceContext,
 		0,0, width, height,
@@ -108,6 +112,10 @@ blitBufferToScreen(Framebuffer *framebuffer, HDC deviceContext,s32 width,s32 hei
 		DIB_RGB_COLORS,
 		SRCCOPY
 		);
+#else
+  
+  SwapBuffers(deviceContext);
+#endif
 }
 
 LRESULT handlingWindowMessages(HWND    window,
@@ -230,8 +238,8 @@ int  WinMain(
 				WS_OVERLAPPEDWINDOW | WS_VISIBLE,
 				CW_USEDEFAULT,
 				CW_USEDEFAULT,
-				CW_USEDEFAULT,
-				CW_USEDEFAULT,
+			        1280,
+				980,
 				0,
 				0,
 				hInstance,
@@ -241,12 +249,22 @@ int  WinMain(
       MSG msg;
       gAppIsRunning = true;
       HDC deviceContext = GetDC(window);
+      createOpenglContext(window,deviceContext);
       while(gAppIsRunning)
 	{
 	  handleInputMessages();
+
+	  Game_framebuffer gameFramebuffer = {};
+	  gameFramebuffer.width = gFramebuffer.width;
+	  gameFramebuffer.height = gFramebuffer.height;
+	  gameFramebuffer.stride = gFramebuffer.stride;
+	  gameFramebuffer.bytesPerPixel = gFramebuffer.bytesPerPixel;
+	  gameFramebuffer.memory = gFramebuffer.memory;
+	  gameUpdateAndRender(&gameFramebuffer);
+	  
 	  Window_dim windowDim = getWindowDim(window);
 	  blitBufferToScreen(&gFramebuffer,deviceContext,windowDim.width,windowDim.height);
-	}
+	}      
     }
   return 0;
 }

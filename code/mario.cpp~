@@ -1,0 +1,13 @@
+void gameUpdateAndRender(Game_framebuffer *framebuffer)
+{  
+  s8 *destRow = (s8*)framebuffer->memory;
+  for(s32 y = 0; y < framebuffer->height;y++)
+    {
+      s32 *pixel = (s32*)destRow;
+      for(s32 x = 0; x < framebuffer->width; x++)
+	{
+	  *pixel++ = 225;
+	}
+      destRow += framebuffer->stride;
+    }  
+}
